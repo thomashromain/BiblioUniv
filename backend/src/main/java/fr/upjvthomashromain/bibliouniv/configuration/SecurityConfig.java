@@ -19,7 +19,7 @@ public class SecurityConfig {
                         // Dashboard and management are reserved for librarians [cite: 14, 15]
                         .requestMatchers("/api/admin/**").hasRole("LIBRARIAN")
                         // Book searching is generally accessible [cite: 10]
-                        .requestMatchers("/api/books/search/**").permitAll()
+                        .requestMatchers("/api/books/**").permitAll()
                         .anyRequest().authenticated()
                 ).sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
