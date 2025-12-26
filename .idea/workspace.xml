@@ -20,6 +20,18 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+  "lastFilter": {
+    "state": "OPEN",
+    "assignee": "thomashromain"
+  }
+}]]></component>
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "https://github.com/thomashromain/BiblioUniv.git",
+    "accountId": "5fa908ac-88f2-492c-a514-4dacc165f676"
+  }
+}]]></component>
   <component name="MavenImportPreferences">
     <option name="generalSettings">
       <MavenGeneralSettings>
@@ -42,6 +54,7 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "Spring Boot.BiblioUnivApplication.executor": "Profiler#1",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
+    "git-widget-placeholder": "master",
     "junie.onboarding.icon.badge.shown": "true",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "/home/Thomas/BiblioUniv",
@@ -80,7 +93,7 @@
       <updated>1766319694652</updated>
       <workItem from="1766319696173" duration="448000" />
       <workItem from="1766320405989" duration="136000" />
-      <workItem from="1766760953811" duration="16000" />
+      <workItem from="1766760953811" duration="40000" />
     </task>
     <servers />
   </component>
