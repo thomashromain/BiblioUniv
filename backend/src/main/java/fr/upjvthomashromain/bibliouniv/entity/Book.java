@@ -16,15 +16,17 @@ public class Book {
     private String author;
     private Integer publishedYear;
     private String isbn;
+    private String bookImage;
 
     // Constructors
     public Book() {}
 
-    public Book(String title, String author, Integer publishedYear, String isbn) {
+    public Book(String title, String author, Integer publishedYear, String isbn, String bookImage) {
         this.title = title;
         this.author = author;
         this.publishedYear = publishedYear;
         this.isbn = isbn;
+        this.bookImage = bookImage;
     }
 
     // Getters and Setters
@@ -66,5 +68,13 @@ public class Book {
 
     public void setIsbn(String isbn) {
         this.isbn = isbn;
+    }
+
+    public String getBookImage() {
+        return bookImage;
+    }
+
+    public void setBookImage(String bookImage) {
+        this.bookImage = bookImage;
     }
 }

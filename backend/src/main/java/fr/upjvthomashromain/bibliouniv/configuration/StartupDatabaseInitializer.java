@@ -16,7 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -28,9 +28,9 @@ public class StartupDatabaseInitializer implements ApplicationListener<Applicati
 
     private static final Logger log = LoggerFactory.getLogger(StartupDatabaseInitializer.class);
 
-    private Map<String, String> createStmts = new HashMap<>();
-    private Map<String, List<String>> insertStmtsMap = new HashMap<>();
-    private Map<String, List<String>> desiredColumnsMap = new HashMap<>();
+    private LinkedHashMap<String, String> createStmts = new LinkedHashMap<>();
+    private Map<String, List<String>> insertStmtsMap = new LinkedHashMap<>();
+    private Map<String, List<String>> desiredColumnsMap = new LinkedHashMap<>();
 
     @Autowired
     private DataSource dataSource;
@@ -71,6 +71,7 @@ public class StartupDatabaseInitializer implements ApplicationListener<Applicati
 
             parseSeedSql();
 
+            boolean allMatch = true;
             for (String tableName : createStmts.keySet()) {
                 List<String> desiredColumns = desiredColumnsMap.get(tableName);
                 List<String> currentColumns = jdbcTemplate.queryForList(
@@ -79,20 +80,19 @@ public class StartupDatabaseInitializer implements ApplicationListener<Applicati
 
                 boolean tableExists = !currentColumns.isEmpty();
                 boolean matches = currentColumns.equals(desiredColumns);
-
-                if (!tableExists) {
-                    log.info("Table {} does not exist — creating and seeding", tableName);
-                    runCreate(tableName);
-                    runInserts(tableName);
-                } else if (!matches) {
-                    log.info("Table {} exists but schema mismatch — migrating", tableName);
-                    migrate(tableName);
-                    runInserts(tableName);
-                } else {
-                    log.info("Table {} exists and matches schema — seeding data", tableName);
-                    runInserts(tableName);
+                if (!tableExists || !matches) {
+                    allMatch = false;
+                    break;
                 }
             }
+
+            if (!allMatch) {
+                log.info("Schema mismatch detected — resetting database");
+                resetDatabase();
+            } else {
+                log.info("Schema matches — seeding data");
+            }
+            runSeedSql();
 
         } catch (SQLException sqle) {
             log.error("Unable to connect to datasource — is MySQL running on {}:{} ?", host, port, sqle);
@@ -103,13 +103,14 @@ public class StartupDatabaseInitializer implements ApplicationListener<Applicati
         }
     }
 
-    private void parseSeedSql() {
+    public void parseSeedSql() {
+        System.out.println("Step 11: Parsing seed SQL");
         ClassPathResource r = new ClassPathResource("db/seed.sql");
         if (!r.exists()) {
+            System.out.println("Step 11: Seed file not found");
             log.warn("Seed file db/seed.sql not found in classpath — skipping");
             return;
         }
-
         try {
             String sql = new String(r.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
             // naive split on semicolon; keep it simple for small seed file
@@ -137,10 +138,13 @@ public class StartupDatabaseInitializer implements ApplicationListener<Applicati
                     }
                 }
             }
+            System.out.println("Step 11: Parsed " + createStmts.size() + " tables");
             log.info("Parsed seed SQL: {} tables", createStmts.size());
         } catch (IOException ioe) {
+            System.out.println("Step 11: Error reading seed file: " + ioe.getMessage());
             log.error("Failed to read seed SQL file", ioe);
         } catch (Exception e) {
+            System.out.println("Step 11: Error parsing seed SQL: " + e.getMessage());
             log.error("Failed to parse seed SQL", e);
         }
     }
@@ -159,32 +163,48 @@ public class StartupDatabaseInitializer implements ApplicationListener<Applicati
         return columns;
     }
 
-    private void runCreate(String tableName) {
-        String stmt = createStmts.get(tableName);
-        if (stmt != null) {
-            log.debug("Executing CREATE statement for {}: {}", tableName, stmt);
-            jdbcTemplate.execute(stmt);
-        }
-    }
-
-    private void runInserts(String tableName) {
-        List<String> stmts = insertStmtsMap.get(tableName);
-        if (stmts != null) {
-            for (String stmt : stmts) {
-                log.debug("Executing INSERT statement for {}: {}", tableName, stmt);
-                jdbcTemplate.execute(stmt);
+    public void runSeedSql() {
+        System.out.println("Step 12: Executing seed SQL");
+        for (String tableName : createStmts.keySet()) {
+            String createStmt = createStmts.get(tableName);
+            if (createStmt != null) {
+                System.out.println("Step 13: Creating table " + tableName);
+                log.debug("Executing CREATE for {}", tableName);
+                jdbcTemplate.execute(createStmt);
+            }
+            List<String> inserts = insertStmtsMap.get(tableName);
+            if (inserts != null) {
+                for (String insert : inserts) {
+                    System.out.println("Step 14: Inserting data into " + tableName);
+                    log.debug("Executing INSERT for {}", tableName);
+                    jdbcTemplate.execute(insert);
+                }
             }
         }
-        log.info("Seeding completed for {}", tableName);
+        System.out.println("Step 15: Seed SQL execution completed");
+        log.info("Database seeding completed");
     }
 
-    private void migrate(String tableName) {
-        log.info("Migrating table {}", tableName);
-        jdbcTemplate.execute("CREATE TABLE " + tableName + "_temp AS SELECT * FROM " + tableName);
-        jdbcTemplate.execute("DROP TABLE " + tableName);
-        runCreate(tableName);
-        jdbcTemplate.execute("INSERT INTO " + tableName + " SELECT * FROM " + tableName + "_temp");
-        jdbcTemplate.execute("DROP TABLE " + tableName + "_temp");
-        log.info("Migration completed for {}", tableName);
+    public void resetDatabase() {
+        System.out.println("Step 4: Starting database reset");
+        parseSeedSql();
+        System.out.println("Step 5: Seed SQL parsed");
+        jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 0");
+        System.out.println("Step 6: Foreign key checks disabled");
+        for (String tableName : createStmts.keySet()) {
+            try {
+                System.out.println("Step 7: Dropping table " + tableName);
+                jdbcTemplate.execute("DROP TABLE IF EXISTS " + tableName);
+                log.debug("Dropped table {}", tableName);
+            } catch (Exception e) {
+                System.out.println("Step 7: Error dropping table " + tableName + ": " + e.getMessage());
+                log.warn("Failed to drop table {}: {}", tableName, e.getMessage());
+            }
+        }
+        System.out.println("Step 8: All tables dropped");
+        jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 1");
+        System.out.println("Step 9: Foreign key checks re-enabled");
+        runSeedSql();
+        System.out.println("Step 10: Seed SQL executed");
     }
 }
