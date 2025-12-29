@@ -18,7 +18,7 @@ public class User {
     private String passwordSha256;
 
     @ManyToOne
-    @JoinColumn(name = "roleId")
+    @JoinColumn(name = "role_id")
     private Role role;
 
     // Constructors

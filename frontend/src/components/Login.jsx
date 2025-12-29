@@ -14,6 +14,7 @@ function Login({ onLogin }) {
             localStorage.setItem('token', token);
             onLogin();
         } catch (err) {
+            
             setError('Invalid credentials');
         }
     };

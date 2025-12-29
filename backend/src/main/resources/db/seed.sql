@@ -13,10 +13,10 @@ CREATE TABLE IF NOT EXISTS book (
 
 CREATE TABLE IF NOT EXISTS role (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  roleName VARCHAR(50) UNIQUE NOT NULL
+  role_name VARCHAR(50) UNIQUE NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS `user` (
+CREATE TABLE IF NOT EXISTS user (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   username VARCHAR(255) UNIQUE NOT NULL,
   password_sha256 VARCHAR(64) NOT NULL,
@@ -46,11 +46,11 @@ INSERT INTO book (title, author, published_year, isbn, book_image) VALUES
 ('Clean Code', 'Robert C. Martin', 2008, '9780132350884', 'cleancode.jpg'),
 ('Design Patterns', 'Gamma et al.', 1994, '9780201633610', 'patterns.jpg');
 
-INSERT INTO role (roleName) VALUES
-('admin'),
-('user');
+INSERT INTO role (id, role_name) VALUES
+(1, 'admin'),
+(2, 'user');
 
-INSERT INTO `user` (username, password_sha256, role_id) VALUES
+INSERT INTO user (username, password_sha256, role_id) VALUES
 ('admin', '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8', 1), 
 ('user1', '04f8996da763b7a969b1028ee3007569eaf3a635486ddab211d512c85b9df8fb', 2);
 

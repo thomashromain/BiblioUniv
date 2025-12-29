@@ -15,7 +15,7 @@ public class BookInstance {
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "bookId")
+    @JoinColumn(name = "book_id")
     private Book book;
 
     // Constructors

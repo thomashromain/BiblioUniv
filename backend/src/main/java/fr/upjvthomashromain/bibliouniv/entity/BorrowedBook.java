@@ -16,11 +16,11 @@ public class BorrowedBook {
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "bookInstanceId")
+    @JoinColumn(name = "book_instance_id")
     private BookInstance bookInstance;
 
     @ManyToOne
-    @JoinColumn(name = "userId")
+    @JoinColumn(name = "user_id")
     private User user;
 
     private LocalDateTime borrowedAtTime;

@@ -24,10 +24,7 @@ api.interceptors.response.use(
         return response;
     },
     (error) => {
-        if (error.response && error.response.status === 401) {
-            localStorage.removeItem('token');
-            window.location.href = '/';
-        }
+        // Do not redirect here, let the component handle it
         return Promise.reject(error);
     }
 );

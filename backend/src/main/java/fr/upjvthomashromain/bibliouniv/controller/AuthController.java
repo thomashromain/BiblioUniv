@@ -8,7 +8,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,6 +33,8 @@ public class AuthController {
         String username = loginRequest.get("username");
         String password = loginRequest.get("password");
         System.out.println("Step 2: Extracted username: " + username);
+
+        userRepository.findAll().forEach(u -> System.out.println("User exists: " + u.getUsername()));
 
         User user = userRepository.findByUsername(username);
         System.out.println("Step 3: User lookup result: " + (user != null ? "found" : "not found"));
