@@ -5,206 +5,163 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationListener;
-import org.springframework.core.env.Environment;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
-import javax.sql.DataSource;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 @Component
 public class StartupDatabaseInitializer implements ApplicationListener<ApplicationReadyEvent> {
 
     private static final Logger log = LoggerFactory.getLogger(StartupDatabaseInitializer.class);
 
-    private LinkedHashMap<String, String> createStmts = new LinkedHashMap<>();
-    private Map<String, List<String>> insertStmtsMap = new LinkedHashMap<>();
-    private Map<String, List<String>> desiredColumnsMap = new LinkedHashMap<>();
-
-    @Autowired
-    private DataSource dataSource;
+    private final LinkedHashMap<String, String> createStmts = new LinkedHashMap<>();
+    private final Map<String, List<String>> insertStmtsMap = new LinkedHashMap<>();
+    private final Map<String, List<String>> desiredColumnsMap = new LinkedHashMap<>();
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    @Autowired
-    private Environment env;
-
     @Override
     public void onApplicationEvent(ApplicationReadyEvent event) {
-        String url = env.getProperty("spring.datasource.url", "jdbc:mysql://localhost:3306/");
-        String host = "localhost";
-        int port = 3306; // default MySQL
+        // Clear maps to ensure fresh state
+        createStmts.clear();
+        insertStmtsMap.clear();
+        desiredColumnsMap.clear();
 
-        try {
-            if (url != null && url.startsWith("jdbc:mysql://")) {
-                String after = url.substring("jdbc:mysql://".length());
-                String hostPortPart = after.split("/", 2)[0];
-                if (hostPortPart.contains(":")) {
-                    String[] hp = hostPortPart.split(":");
-                    host = hp[0];
-                    try { port = Integer.parseInt(hp[1]); } catch (NumberFormatException ignored) {}
-                } else {
-                    host = hostPortPart;
-                }
-            }
-        } catch (Exception e) {
-            log.warn("Could not parse datasource URL '{}', using defaults", url);
+        parseSeedSql();
+
+        if (createStmts.isEmpty()) {
+            log.info("No schema found in seed.sql to verify.");
+            return;
         }
 
-        log.info("Expecting MySQL on {}:{} (default port 3306 if none provided)", host, port);
-
-        // Check connectivity
-        try (Connection c = dataSource.getConnection()) {
-            log.info("Connected to database: {}", c.getMetaData().getURL());
-
-            parseSeedSql();
-
-            boolean allMatch = true;
-            for (String tableName : createStmts.keySet()) {
-                List<String> desiredColumns = desiredColumnsMap.get(tableName);
-                List<String> currentColumns = jdbcTemplate.queryForList(
-                        "SELECT column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? ORDER BY ordinal_position",
-                        String.class, tableName);
-
-                boolean tableExists = !currentColumns.isEmpty();
-                boolean matches = currentColumns.equals(desiredColumns);
-                if (!tableExists || !matches) {
-                    allMatch = false;
-                    break;
-                }
+        // Check each table and warn if mismatch found
+        for (String tableName : createStmts.keySet()) {
+            if (!checkTableSchema(tableName)) {
+                log.warn("### SCHEMA MISMATCH DETECTED ### Table '{}' does not match seed.sql definition!", tableName);
+                log.warn("Expected columns: {}", desiredColumnsMap.get(tableName));
+                log.warn("To synchronize, a database reset is required.");
+                // We do NOT call resetDatabase() here anymore.
             }
-
-            if (!allMatch) {
-                log.info("Schema mismatch detected — resetting database");
-                resetDatabase();
-            } else {
-                log.info("Schema matches — seeding data");
-            }
-            runSeedSql();
-
-        } catch (SQLException sqle) {
-            log.error("Unable to connect to datasource — is MySQL running on {}:{} ?", host, port, sqle);
-            throw new RuntimeException("Database connection failed", sqle);
-        } catch (Exception e) {
-            log.error("Unexpected error during startup DB check", e);
-            throw new RuntimeException("Startup database initialization failed", e);
         }
     }
 
-    public void parseSeedSql() {
-        System.out.println("Step 11: Parsing seed SQL");
-        ClassPathResource r = new ClassPathResource("db/seed.sql");
-        if (!r.exists()) {
-            System.out.println("Step 11: Seed file not found");
-            log.warn("Seed file db/seed.sql not found in classpath — skipping");
-            return;
-        }
+    /**
+     * Compares the live MySQL schema against the parsed desiredColumnsMap.
+     */
+    private boolean checkTableSchema(String tableName) {
         try {
-            String sql = new String(r.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            // naive split on semicolon; keep it simple for small seed file
-            String[] statements = Stream.of(sql.split(";"))
-                    .map(String::trim)
-                    .filter(s -> !s.isEmpty())
-                    .toArray(String[]::new);
+            List<String> actualColumns = jdbcTemplate.queryForList(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION",
+                String.class, tableName);
 
-            Pattern createPattern = Pattern.compile("CREATE TABLE(?: IF NOT EXISTS)?\\s+(\\w+)\\s*\\((.*)\\)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
-            Pattern insertPattern = Pattern.compile("INSERT INTO\\s+(\\w+)\\s+.*", Pattern.CASE_INSENSITIVE);
+            if (actualColumns.isEmpty()) return false;
+
+            List<String> expected = desiredColumnsMap.get(tableName);
+            
+            if (actualColumns.size() != expected.size()) return false;
+
+            for (int i = 0; i < expected.size(); i++) {
+                if (!expected.get(i).equalsIgnoreCase(actualColumns.get(i))) return false;
+            }
+            return true;
+        } catch (Exception e) {
+            log.error("Error checking schema for table: {}", tableName, e);
+            return false;
+        }
+    }
+
+    /**
+     * Nukes the database and runs the full seed.sql script.
+     */
+    public void resetDatabase() {
+        log.warn("### MANUAL RESET TRIGGERED: NUKING AND RE-SEEDING ###");
+        
+        // Ensure maps are populated before resetting
+        if (createStmts.isEmpty()) parseSeedSql();
+
+        try {
+            jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 0");
+
+            List<String> currentTables = jdbcTemplate.queryForList(
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()", String.class);
+
+            for (String table : currentTables) {
+                jdbcTemplate.execute("DROP TABLE IF EXISTS `" + table + "`");
+            }
+            
+            jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 1");
+
+            // Recreate Tables
+            for (String tableName : createStmts.keySet()) {
+                jdbcTemplate.execute(createStmts.get(tableName));
+            }
+
+            // Insert Data
+            for (Map.Entry<String, List<String>> entry : insertStmtsMap.entrySet()) {
+                for (String sql : entry.getValue()) {
+                    jdbcTemplate.execute(sql);
+                }
+            }
+            log.info("### DATABASE RESET COMPLETED SUCCESSFULLY ###");
+        } catch (Exception e) {
+            log.error("Database reset failed!", e);
+        }
+    }
+
+    private void parseSeedSql() {
+        ClassPathResource r = new ClassPathResource("db/seed.sql");
+        try {
+            String content = new String(r.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            String[] statements = content.split(";\\s*(\\r?\\n|$)");
+
+            Pattern createPattern = Pattern.compile("CREATE TABLE(?: IF NOT EXISTS)?\\s+`?(\\w+)`?\\s*\\((.*)\\)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+            Pattern insertPattern = Pattern.compile("INSERT INTO\\s+`?(\\w+)`?", Pattern.CASE_INSENSITIVE);
 
             for (String stmt : statements) {
-                Matcher createMatcher = createPattern.matcher(stmt);
+                String cleanStmt = stmt.trim();
+                if (cleanStmt.isEmpty()) continue;
+
+                Matcher createMatcher = createPattern.matcher(cleanStmt);
                 if (createMatcher.find()) {
-                    String tableName = createMatcher.group(1);
-                    String columnsPart = createMatcher.group(2);
-                    createStmts.put(tableName, stmt);
-                    List<String> columns = parseColumns(columnsPart);
-                    desiredColumnsMap.put(tableName, columns);
+                    String tableName = createMatcher.group(1).toLowerCase();
+                    createStmts.put(tableName, cleanStmt);
+                    desiredColumnsMap.put(tableName, extractColumnNames(createMatcher.group(2)));
                 } else {
-                    Matcher insertMatcher = insertPattern.matcher(stmt);
+                    Matcher insertMatcher = insertPattern.matcher(cleanStmt);
                     if (insertMatcher.find()) {
-                        String tableName = insertMatcher.group(1);
-                        insertStmtsMap.computeIfAbsent(tableName, k -> new ArrayList<>()).add("INSERT IGNORE" + stmt.substring(6));
+                        String tableName = insertMatcher.group(1).toLowerCase();
+                        insertStmtsMap.computeIfAbsent(tableName, k -> new ArrayList<>()).add(cleanStmt);
                     }
                 }
             }
-            System.out.println("Step 11: Parsed " + createStmts.size() + " tables");
-            log.info("Parsed seed SQL: {} tables", createStmts.size());
-        } catch (IOException ioe) {
-            System.out.println("Step 11: Error reading seed file: " + ioe.getMessage());
-            log.error("Failed to read seed SQL file", ioe);
-        } catch (Exception e) {
-            System.out.println("Step 11: Error parsing seed SQL: " + e.getMessage());
-            log.error("Failed to parse seed SQL", e);
+        } catch (IOException e) {
+            log.error("Failed to parse seed.sql", e);
         }
     }
 
-    private List<String> parseColumns(String columnsPart) {
+    private List<String> extractColumnNames(String body) {
         List<String> columns = new ArrayList<>();
-        // Simple parsing: split by comma, take first word as column name
-        String[] parts = columnsPart.split(",");
-        for (String part : parts) {
-            String trimmed = part.trim();
-            if (!trimmed.isEmpty()) {
-                String columnName = trimmed.split("\\s+")[0];
-                columns.add(columnName);
+        String[] lines = body.split(",(?![^\\(]*\\))");
+        for (String line : lines) {
+            String trimmed = line.trim().replaceAll("`", "");
+            String upper = trimmed.toUpperCase();
+            if (upper.startsWith("PRIMARY") || upper.startsWith("FOREIGN") || 
+                upper.startsWith("KEY") || upper.startsWith("CONSTRAINT") || 
+                upper.startsWith("UNIQUE") || upper.startsWith("CHECK")) {
+                continue;
+            }
+            String[] parts = trimmed.split("\\s+");
+            if (parts.length > 0 && !parts[0].isEmpty()) {
+                columns.add(parts[0]);
             }
         }
         return columns;
-    }
-
-    public void runSeedSql() {
-        System.out.println("Step 12: Executing seed SQL");
-        for (String tableName : createStmts.keySet()) {
-            String createStmt = createStmts.get(tableName);
-            if (createStmt != null) {
-                System.out.println("Step 13: Creating table " + tableName);
-                log.debug("Executing CREATE for {}", tableName);
-                jdbcTemplate.execute(createStmt);
-            }
-            List<String> inserts = insertStmtsMap.get(tableName);
-            if (inserts != null) {
-                for (String insert : inserts) {
-                    System.out.println("Step 14: Inserting data into " + tableName);
-                    log.debug("Executing INSERT for {}", tableName);
-                    jdbcTemplate.execute(insert);
-                }
-            }
-        }
-        System.out.println("Step 15: Seed SQL execution completed");
-        log.info("Database seeding completed");
-    }
-
-    public void resetDatabase() {
-        System.out.println("Step 4: Starting database reset");
-        parseSeedSql();
-        System.out.println("Step 5: Seed SQL parsed");
-        jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 0");
-        System.out.println("Step 6: Foreign key checks disabled");
-        for (String tableName : createStmts.keySet()) {
-            try {
-                System.out.println("Step 7: Dropping table " + tableName);
-                jdbcTemplate.execute("DROP TABLE IF EXISTS " + tableName);
-                log.debug("Dropped table {}", tableName);
-            } catch (Exception e) {
-                System.out.println("Step 7: Error dropping table " + tableName + ": " + e.getMessage());
-                log.warn("Failed to drop table {}: {}", tableName, e.getMessage());
-            }
-        }
-        System.out.println("Step 8: All tables dropped");
-        jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 1");
-        System.out.println("Step 9: Foreign key checks re-enabled");
-        runSeedSql();
-        System.out.println("Step 10: Seed SQL executed");
     }
 }

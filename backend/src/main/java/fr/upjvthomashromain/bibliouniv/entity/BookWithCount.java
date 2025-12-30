@@ -8,73 +8,42 @@ public class BookWithCount {
     private String isbn;
     private String bookImage;
     private long instanceCount;
+    private boolean canCreate;
+    private boolean canDelete;
 
     public BookWithCount() {}
 
-    public BookWithCount(Book book, long instanceCount) {
-        this.id = book.getId();
-        this.title = book.getTitle();
-        this.author = book.getAuthor();
-        this.publishedYear = book.getPublishedYear();
-        this.isbn = book.getIsbn();
-        this.bookImage = book.getBookImage();
+    public BookWithCount(Book book, long instanceCount, boolean canCreate, boolean canDelete) {
+        this.id = (book != null) ? book.getId() : null;
+        this.title = (book != null) ? book.getTitle() : null;
+        this.author = (book != null) ? book.getAuthor() : null;
+        this.publishedYear = (book != null) ? book.getPublishedYear() : null;
+        this.isbn = (book != null) ? book.getIsbn() : null;
+        this.bookImage = (book != null) ? book.getBookImage() : null;
         this.instanceCount = instanceCount;
+        this.canCreate = canCreate;
+        this.canDelete = canDelete;
     }
 
-    // Getters and Setters
-    public Long getId() {
-        return id;
-    }
+    // Getters
+    public Long getId() { return id; }
+    public String getTitle() { return title; }
+    public String getAuthor() { return author; }
+    public Integer getPublishedYear() { return publishedYear; }
+    public String getIsbn() { return isbn; }
+    public String getBookImage() { return bookImage; }
+    public long getInstanceCount() { return instanceCount; }
+    public boolean isCanCreate() { return canCreate; }
+    public boolean isCanDelete() { return canDelete; }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public void setTitle(String title) {
-        this.title = title;
-    }
-
-    public String getAuthor() {
-        return author;
-    }
-
-    public void setAuthor(String author) {
-        this.author = author;
-    }
-
-    public Integer getPublishedYear() {
-        return publishedYear;
-    }
-
-    public void setPublishedYear(Integer publishedYear) {
-        this.publishedYear = publishedYear;
-    }
-
-    public String getIsbn() {
-        return isbn;
-    }
-
-    public void setIsbn(String isbn) {
-        this.isbn = isbn;
-    }
-
-    public String getBookImage() {
-        return bookImage;
-    }
-
-    public void setBookImage(String bookImage) {
-        this.bookImage = bookImage;
-    }
-
-    public long getInstanceCount() {
-        return instanceCount;
-    }
-
-    public void setInstanceCount(long instanceCount) {
-        this.instanceCount = instanceCount;
-    }
+    // Setters
+    public void setId(Long id) { this.id = id; }
+    public void setTitle(String title) { this.title = title; }
+    public void setAuthor(String author) { this.author = author; }
+    public void setPublishedYear(Integer publishedYear) { this.publishedYear = publishedYear; }
+    public void setIsbn(String isbn) { this.isbn = isbn; }
+    public void setBookImage(String bookImage) { this.bookImage = bookImage; }
+    public void setInstanceCount(long instanceCount) { this.instanceCount = instanceCount; }
+    public void setCanCreate(boolean canCreate) { this.canCreate = canCreate; }
+    public void setCanDelete(boolean canDelete) { this.canDelete = canDelete; }
 }

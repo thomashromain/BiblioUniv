@@ -5,6 +5,7 @@ import Books from './components/Books';
 //import BookDetail from './components/BookDetail'; // You'll create this
 import api from './services/api';
 import './App.css';
+import BookDetails from './components/BookDetails';
 
 function App() {
     const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('token'));
@@ -58,7 +59,7 @@ function App() {
                     {/* Dynamic Route: /books/1, /books/2, etc. */}
                     <Route 
                         path="/books/:id" 
-                        element={isLoggedIn ? <Books /> : <Navigate to="/login" />} 
+                        element={isLoggedIn ? <BookDetails /> : <Navigate to="/login" />} 
                     />
 
                     {/* Redirect root to books or login */}
