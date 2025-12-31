@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS book (
 
 CREATE TABLE IF NOT EXISTS role (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  role_name VARCHAR(50) UNIQUE NOT NULL
+  role_name VARCHAR(50) UNIQUE NOT NULL,
+  can_manipulate_books BOOLEAN DEFAULT FALSE
 );
 
 CREATE TABLE IF NOT EXISTS user (
@@ -46,9 +47,9 @@ INSERT INTO book (title, author, published_year, isbn, book_image) VALUES
 ('Clean Code', 'Robert C. Martin', 2008, '9780132350884', 'cleancode.jpg'),
 ('Design Patterns', 'Gamma et al.', 1994, '9780201633610', 'patterns.jpg');
 
-INSERT INTO role (id, role_name) VALUES
-(1, 'admin'),
-(2, 'user');
+INSERT INTO role (id, role_name,can_manipulate_books) VALUES
+(1, 'admin',TRUE),
+(2, 'user',FALSE);
 
 INSERT INTO user (username, password_sha256, role_id) VALUES
 ('admin', '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8', 1), 

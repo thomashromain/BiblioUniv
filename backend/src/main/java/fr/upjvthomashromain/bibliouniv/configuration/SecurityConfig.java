@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -15,12 +16,12 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
 
 import java.util.List;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Autowired
@@ -58,9 +59,11 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/login").permitAll()
                         .requestMatchers("/api/auth/**").authenticated()
-                        .requestMatchers("/api/admin/reset-db").permitAll()
-                        .requestMatchers("/api/admin/test").permitAll()
+                        .requestMatchers("/api/admin/reset-db").authenticated()
+                        .requestMatchers("/api/admin/test").authenticated()
                         .requestMatchers("/api/books/**").authenticated()
+                        .requestMatchers("/api/borrowings/**").authenticated()
+                        .requestMatchers("/api/borrowings/late-count").authenticated()
                         .anyRequest().authenticated()
                 ).sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)

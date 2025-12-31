@@ -2,15 +2,19 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
 import Login from './components/Login';
 import Books from './components/Books';
-//import BookDetail from './components/BookDetail'; // You'll create this
+import BookDetails from './components/BookDetails';
+import Navbar from './components/Navbar';
+import {MyBorrowings} from './components/MyBorrowings';
 import api from './services/api';
 import './App.css';
-import BookDetails from './components/BookDetails';
+import AdminPanel from './components/AdminPanel';
 
 function App() {
+    // Sync login state with localStorage
     const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('token'));
 
     const handleLogin = () => setIsLoggedIn(true);
+    
     const handleLogout = () => {
         localStorage.removeItem('token');
         setIsLoggedIn(false);
@@ -27,22 +31,26 @@ function App() {
 
     return (
         <Router>
+            <Navbar isLoggedIn={isLoggedIn} onLogout={handleLogout} />
             <div className="app-container">
-                {/* Dev Tools */}
+                {/* Dev Tools - Only shows in development */}
                 {import.meta.env.DEV && (
                     <button onClick={handleResetDB} className="dev-reset-btn">Force Reset DB</button>
                 )}
 
-                {/* Navigation Bar */}
-                <nav>
-                    <Link to="/">Home</Link> | 
-                    <Link to="/books"> Browse Books</Link>
-                    {isLoggedIn && <button onClick={handleLogout}>Logout</button>}
+                <nav className="main-nav">
+                    <Link to="/">Home</Link>
+                    <Link to="/books">Browse Books</Link>
+                    {isLoggedIn && (
+                        <>
+                            <Link to="/my-borrowings">My Borrowings</Link>
+                            <button onClick={handleLogout} className="logout-link">Logout</button>
+                        </>
+                    )}
                 </nav>
 
                 <hr />
 
-                {/* Page Routing */}
                 <Routes>
                     {/* Public Route */}
                     <Route 
@@ -56,13 +64,22 @@ function App() {
                         element={isLoggedIn ? <Books /> : <Navigate to="/login" />} 
                     />
 
-                    {/* Dynamic Route: /books/1, /books/2, etc. */}
                     <Route 
                         path="/books/:id" 
                         element={isLoggedIn ? <BookDetails /> : <Navigate to="/login" />} 
                     />
 
-                    {/* Redirect root to books or login */}
+                    <Route 
+                        path="/my-borrowings" 
+                        element={isLoggedIn ? <MyBorrowings /> : <Navigate to="/login" />} 
+                    />
+
+                    <Route 
+                        path="/admin" 
+                        element={isLoggedIn ? <AdminPanel /> : <Navigate to="/login" />} 
+                    />
+
+                    {/* Redirect root */}
                     <Route path="/" element={<Navigate to={isLoggedIn ? "/books" : "/login"} />} />
                 </Routes>
             </div>

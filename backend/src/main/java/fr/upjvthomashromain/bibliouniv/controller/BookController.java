@@ -1,7 +1,8 @@
 package fr.upjvthomashromain.bibliouniv.controller;
 
-import fr.upjvthomashromain.bibliouniv.entity.Book;
+import fr.upjvthomashromain.bibliouniv.configuration.CustomUserDetails;
 import fr.upjvthomashromain.bibliouniv.entity.BookWithCount;
+import fr.upjvthomashromain.bibliouniv.entity.User;
 import fr.upjvthomashromain.bibliouniv.repository.BookRepository;
 import fr.upjvthomashromain.bibliouniv.repository.BookInstanceRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +29,7 @@ public class BookController {
 
     @GetMapping
     public List<BookWithCount> getAllBooks() {
-        boolean isAdmin = checkIsAdmin();
+        boolean isAdmin = canManipulate();
         return bookRepository.findAll().stream()
                 .map(book -> new BookWithCount(
                     book, 
@@ -41,7 +42,7 @@ public class BookController {
 
     @GetMapping("/{id}")
     public ResponseEntity<BookWithCount> getBookById(@PathVariable Long id) {
-        boolean isAdmin = checkIsAdmin();
+        boolean isAdmin = canManipulate();
         return bookRepository.findById(id)
                 .map(book -> {
                     long count = bookInstanceRepository.countByBookId(book.getId());
@@ -52,14 +53,17 @@ public class BookController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    private boolean checkIsAdmin() {
+    private boolean canManipulate() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) {
-            return false;
-        }
+    
+        if (auth != null && auth.getPrincipal() instanceof CustomUserDetails) {
+            CustomUserDetails customUserDetails = (CustomUserDetails) auth.getPrincipal();
+            User userEntity = customUserDetails.getUser();
         
-        // Match the uppercase "ROLE_ADMIN" produced by your CustomUserDetailsService
-        return auth.getAuthorities().stream()
-                   .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+            // Now you are checking the actual boolean from the database!
+            return userEntity.getRole() != null && userEntity.getRole().isCanManipulateBooks();
+        }
+    
+        return false;
     }
 }

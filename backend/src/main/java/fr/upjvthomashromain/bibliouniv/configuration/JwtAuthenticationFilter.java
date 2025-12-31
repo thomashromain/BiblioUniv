@@ -25,48 +25,33 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private UserDetailsService userDetailsService;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-            throws ServletException, IOException {
-        System.out.println("JWT Filter: Processing request: " + request.getMethod() + " " + request.getRequestURI());
-        final String authorizationHeader = request.getHeader("Authorization");
+protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+        throws ServletException, IOException {
+    
+    String authHeader = request.getHeader("Authorization");
+    System.out.println("FILTER DEBUG: URI: " + request.getRequestURI());
+    System.out.println("FILTER DEBUG: Auth Header: " + (authHeader != null ? "Present" : "MISSING"));
 
-        String username = null;
-        String jwt = null;
-
-        if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
-            jwt = authorizationHeader.substring(7);
-            try {
-                username = jwtUtil.extractUsername(jwt);
-            } catch (Exception e) {
-                if (!request.getRequestURI().equals("/api/login")) {
-                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid token");
-                    return;
-                }
-                username = null;
-            }
-        }
-
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            try {
-                UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
-                if (jwtUtil.validateToken(jwt, userDetails.getUsername())) {
-                    UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
+    // Simplify: Just try to extract and set the context
+    if (authHeader != null && authHeader.startsWith("Bearer ")) {
+        String token = authHeader.substring(7);
+        try {
+            String username = jwtUtil.extractUsername(token);
+            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                if (jwtUtil.validateToken(token, userDetails.getUsername())) {
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails, null, userDetails.getAuthorities());
-                    authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authenticationToken);
-                } else {
-                    if (!request.getRequestURI().equals("/api/login")) {
-                        response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token validation failed");
-                        return;
-                    }
-                }
-            } catch (Exception e) {
-                if (!request.getRequestURI().equals("/api/login")) {
-                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "User not found");
-                    return;
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             }
+        } catch (Exception e) {
+            System.out.println("FILTER DEBUG: Token error: " + e.getMessage());
         }
-        chain.doFilter(request, response);
     }
+    
+    // REMOVE the manual response.sendError() calls for now.
+    // Let the chain continue so Spring Security's config handles the 403.
+    chain.doFilter(request, response);
+}
 }

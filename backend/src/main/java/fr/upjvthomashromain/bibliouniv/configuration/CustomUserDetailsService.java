@@ -2,7 +2,11 @@ package fr.upjvthomashromain.bibliouniv.configuration;
 
 import fr.upjvthomashromain.bibliouniv.entity.User;
 import fr.upjvthomashromain.bibliouniv.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+
+import java.util.List;
+
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -11,19 +15,27 @@ import org.springframework.stereotype.Service;
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
+
+    // Use Constructor Injection instead of @Autowired on the field
+    public CustomUserDetailsService(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         User user = userRepository.findByUsername(username);
+        
         if (user == null) {
-            throw new UsernameNotFoundException("User not found");
+            throw new UsernameNotFoundException("User not found: " + username);
         }
-        return org.springframework.security.core.userdetails.User.builder()
-                .username(user.getUsername())
-                .password(user.getPasswordSha256())
-                .roles(user.getRole().getRoleName().toUpperCase())
-                .build();
+
+        String roleName = (user.getRole() != null) ? user.getRole().getRoleName() : "user";
+        
+        List<GrantedAuthority> authorities = List.of(
+            new SimpleGrantedAuthority(roleName)
+        );
+
+        return new CustomUserDetails(user, authorities);
     }
 }

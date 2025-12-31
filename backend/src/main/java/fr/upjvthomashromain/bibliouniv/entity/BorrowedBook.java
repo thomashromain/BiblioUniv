@@ -1,5 +1,6 @@
 package fr.upjvthomashromain.bibliouniv.entity;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -23,8 +24,14 @@ public class BorrowedBook {
     @JoinColumn(name = "user_id")
     private User user;
 
+    
+    @Column(name = "`borrowedAtTime`", nullable = false)
     private LocalDateTime borrowedAtTime;
+
+    @Column(name = "`returnAtTime`", nullable = false)
     private LocalDateTime returnAtTime;
+
+    @Column(name = "`returnedBoolean`")
     private Boolean returnedBoolean;
 
     // Constructors

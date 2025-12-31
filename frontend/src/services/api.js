@@ -4,29 +4,29 @@ const api = axios.create({
     baseURL: '/api',
 });
 
-// Request interceptor to add token
 api.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('token');
+        // If the header is already set (e.g., by our test suite), 
+        // don't overwrite it with the logged-in user's token.
+        if (config.headers.Authorization) {
+            return config;
+        }
+
+        const token = localStorage.getItem('token'); 
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
     },
-    (error) => {
-        return Promise.reject(error);
-    }
+    (error) => Promise.reject(error)
 );
 
-// Response interceptor to handle token expiration
-api.interceptors.response.use(
-    (response) => {
-        return response;
-    },
-    (error) => {
-        // Do not redirect here, let the component handle it
-        return Promise.reject(error);
-    }
-);
+// Optional: Helper for clean manual calls
+export const apiWithToken = (token) => {
+    return axios.create({
+        baseURL: '/api',
+        headers: { Authorization: `Bearer ${token}` }
+    });
+};
 
 export default api;
